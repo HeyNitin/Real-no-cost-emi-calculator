@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real No Cost EMI Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="sticky-header">
+        <div class="header-content">
+            <h1>Real No Cost EMI Calculator</h1>
+            <p>Understand the true cost of your EMI payments including hidden charges</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <section class="calculator-form" id="calculator-section">
+                <form id="emiForm">
+                    <div class="form-group">
+                        <label for="totalAmount">Total Amount (₹)</label>
+                        <input type="number" id="totalAmount" required placeholder="e.g., 100000">
+                        <span class="error" id="totalAmount-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loanTenure">Loan Tenure (months)</label>
+                        <input type="number" id="loanTenure" required placeholder="e.g., 12">
+                        <span class="error" id="loanTenure-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="emiAmount">EMI Amount (₹)</label>
+                        <input type="number" id="emiAmount" required placeholder="e.g., 8500">
+                        <span class="error" id="emiAmount-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="label-with-info">
+                            <label for="interestRate">Bank's Interest Rate (%)</label>
+                            <div class="info-tooltip">
+                                <span class="info-icon">ⓘ</span>
+                                <div class="tooltip-content">
+                                    In No-Cost EMI, banks still charge interest but it's given as an upfront discount by the seller. 
+                                    Check your product page or payment gateway for the interest rate being charged (usually between 12-15%). 
+                                    This interest amount is what the bank deducts from the seller, and GST is charged on this interest.
+                                </div>
+                            </div>
+                        </div>
+                        <input type="number" id="interestRate" required placeholder="e.g., 12">
+                        <span class="error" id="interestRate-error"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="processingFees">Processing Fees (₹)</label>
+                        <input type="number" id="processingFees" required placeholder="e.g., 1000">
+                        <span class="error" id="processingFees-error"></span>
+                    </div>
+
+                    <button type="submit" class="calculate-btn">Calculate</button>
+                </form>
+            </section>
+
+            <section class="results hidden" id="results">
+                <div class="summary-box">
+                    <div class="summary-header">
+                        <h2>Cost Summary</h2>
+                        <button type="button" class="recalculate-btn" id="recalculateBtn">Recalculate</button>
+                    </div>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <span>Actual Amount</span>
+                            <span id="summary-total">₹0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span>Total Hidden Cost</span>
+                            <span id="summary-hidden-cost">₹0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span>Actual Amount to be Paid</span>
+                            <span id="summary-total-payable">₹0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span>Hidden Cost Percentage</span>
+                            <span id="summary-hidden-percentage">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <h2>Monthly Breakdown</h2>
+                    <table id="emiTable">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Remaining Balance</th>
+                                <th>Principal Repaid</th>
+                                <th>Interest Paid</th>
+                                <th>GST on Interest</th>
+                                <th>Processing Fees + GST</th>
+                                <th>Total Monthly Payment</th>
+                            </tr>
+                        </thead>
+                        <tbody id="emiTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
