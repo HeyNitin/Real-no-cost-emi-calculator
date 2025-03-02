@@ -11,6 +11,11 @@ const summaryTotalPayable = document.getElementById('summary-total-payable');
 const summaryHiddenPercentage = document.getElementById('summary-hidden-percentage');
 const recalculateBtn = document.getElementById('recalculateBtn');
 const calculatorSection = document.getElementById('calculator-section');
+const emiType = document.getElementById('emiType');
+const emiAmountGroup = document.getElementById('emiAmountGroup');
+const emiAmountInput = document.getElementById('emiAmount');
+const totalAmountInput = document.getElementById('totalAmount');
+const loanTenureInput = document.getElementById('loanTenure');
 
 // Utility Functions
 const formatCurrency = (amount) => {
@@ -45,9 +50,33 @@ const resetForm = () => {
     resultsSection.classList.add('hidden');
     const errorElements = document.querySelectorAll('.error');
     errorElements.forEach(element => element.textContent = '');
+    updateEMIFieldVisibility();
 };
 
-// Validation Functions
+const updateEMIFieldVisibility = () => {
+    if (emiType.value === 'no-cost') {
+        emiAmountGroup.style.display = 'none';
+        emiAmountInput.required = false;
+        emiAmountInput.disabled = true;
+        calculateNoCostEMI();
+    } else {
+        emiAmountGroup.style.display = 'block';
+        emiAmountInput.required = true;
+        emiAmountInput.disabled = false;
+        emiAmountInput.value = '';
+    }
+};
+
+const calculateNoCostEMI = () => {
+    const totalAmount = parseFloat(totalAmountInput.value);
+    const loanTenure = parseInt(loanTenureInput.value);
+    
+    if (!isNaN(totalAmount) && !isNaN(loanTenure) && totalAmount > 0 && loanTenure > 0) {
+        const monthlyEMI = totalAmount / loanTenure;
+        emiAmountInput.value = monthlyEMI.toFixed(2);
+    }
+};
+
 const validateInput = (input, fieldName) => {
     const value = parseFloat(input.value);
     const errorElement = document.getElementById(`${input.id}-error`);
@@ -147,7 +176,7 @@ emiForm.addEventListener('submit', (e) => {
     const isValid = [
         validateInput(totalAmount, 'Total Amount'),
         validateInput(loanTenure, 'Loan Tenure'),
-        validateInput(emiAmount, 'EMI Amount'),
+        emiType.value === 'no-cost' || validateInput(emiAmount, 'Monthly EMI Amount'),
         validateInput(interestRate, 'Interest Rate'),
         validateInput(processingFees, 'Processing Fees')
     ].every(Boolean);
@@ -179,4 +208,51 @@ emiForm.addEventListener('submit', (e) => {
 recalculateBtn.addEventListener('click', () => {
     scrollToTop();
     resetForm();
+});
+
+// Add event listeners for EMI type changes
+emiType.addEventListener('change', () => {
+    updateEMIFieldVisibility();
+});
+
+// Add event listeners for automatic No Cost EMI calculation
+totalAmountInput.addEventListener('input', () => {
+    if (emiType.value === 'no-cost') {
+        calculateNoCostEMI();
+    }
+});
+
+loanTenureInput.addEventListener('input', () => {
+    if (emiType.value === 'no-cost') {
+        calculateNoCostEMI();
+    }
+});
+
+// Initialize EMI field visibility on page load
+updateEMIFieldVisibility();
+
+// EMI type button functionality
+const emiTypeButtons = document.querySelectorAll('.emi-type-btn');
+const emiTypeInput = document.getElementById('emiType');
+
+// Update EMI type buttons
+const updateEMITypeButtons = (selectedType) => {
+    emiTypeButtons.forEach(button => {
+        if (button.dataset.type === selectedType) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    });
+    emiTypeInput.value = selectedType;
+    updateEMIFieldVisibility();
+};
+
+// Add event listeners for EMI type buttons
+emiTypeButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const selectedType = button.dataset.type;
+        updateEMITypeButtons(selectedType);
+        resetForm();
+    });
 });
