@@ -1,60 +1,87 @@
 // Constants
 const GST_RATE = 0.18;
 
-// DOM Elements
-const emiForm = document.getElementById('emiForm');
-const resultsSection = document.getElementById('results');
-const emiTableBody = document.getElementById('emiTableBody');
-const summaryTotal = document.getElementById('summary-total');
-const summaryHiddenCost = document.getElementById('summary-hidden-cost');
-const summaryTotalPayable = document.getElementById('summary-total-payable');
-const summaryHiddenPercentage = document.getElementById('summary-hidden-percentage');
-const recalculateBtn = document.getElementById('recalculateBtn');
-const calculatorSection = document.getElementById('calculator-section');
-const emiType = document.getElementById('emiType');
-const emiAmountGroup = document.getElementById('emiAmountGroup');
-const emiAmountInput = document.getElementById('emiAmount');
-const totalAmountInput = document.getElementById('totalAmount');
-const loanTenureInput = document.getElementById('loanTenure');
-
 // Utility Functions
-const formatCurrency = (amount) => {
+function formatCurrency(amount) {
     return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     }).format(amount);
-};
+}
 
-const formatPercentage = (value) => {
+function formatPercentage(value) {
     return new Intl.NumberFormat('en-IN', {
-        style: 'percent',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
-    }).format(value / 100);
-};
+    }).format(value) + '%';
+}
 
-const scrollToResults = () => {
-    const headerHeight = document.querySelector('.sticky-header').offsetHeight;
-    const resultsTop = resultsSection.getBoundingClientRect().top + window.pageYOffset - headerHeight - 20;
-    window.scrollTo({ top: resultsTop, behavior: 'smooth' });
-};
+function validateInput(input, fieldName) {
+    const value = parseFloat(input.value);
+    const errorElement = document.getElementById(`${input.id}-error`);
+    
+    if (!errorElement) {
+        return !isNaN(value) && value >= 0;
+    }
 
-const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-};
+    if (isNaN(value) || value < 0) {
+        errorElement.textContent = `Please enter a valid ${fieldName}`;
+        return false;
+    }
+    
+    errorElement.textContent = '';
+    return true;
+}
 
-const resetForm = () => {
-    emiForm.reset();
-    resultsSection.classList.add('hidden');
-    const errorElements = document.querySelectorAll('.error');
-    errorElements.forEach(element => element.textContent = '');
-    updateEMIFieldVisibility();
-};
+function calculateEMIBreakdown(totalAmount, loanTenure, emiAmount, interestRate, processingFees) {
+    const breakdown = [];
+    let remainingBalance = totalAmount;
+    let totalProcessingFees = processingFees * (1 + GST_RATE);
+    let totalInterest = 0;
+    let totalGSTOnInterest = 0;
 
-const updateEMIFieldVisibility = () => {
-    if (emiType.value === 'no-cost') {
+    for (let month = 1; month <= loanTenure; month++) {
+        const monthlyInterest = remainingBalance * (interestRate / 12 / 100);
+        const gstOnInterest = monthlyInterest * GST_RATE;
+        const principalRepaid = emiAmount - monthlyInterest;
+        
+        totalInterest += monthlyInterest;
+        totalGSTOnInterest += gstOnInterest;
+        
+        const monthlyBreakdown = {
+            month,
+            principalRepaid,
+            interest: monthlyInterest,
+            gstOnInterest,
+            processingFees: month === 1 ? totalProcessingFees : 0,
+            totalMonthlyPayment: emiAmount + (month === 1 ? totalProcessingFees : 0) + gstOnInterest,
+            remainingBalance: Math.max(0, remainingBalance - principalRepaid)
+        };
+        
+        breakdown.push(monthlyBreakdown);
+        remainingBalance = monthlyBreakdown.remainingBalance;
+    }
+
+    const totalHiddenCost = totalProcessingFees + totalInterest + totalGSTOnInterest;
+    const hiddenCostPercentage = (totalHiddenCost / totalAmount) * 100;
+
+    return {
+        breakdown,
+        totalHiddenCost,
+        hiddenCostPercentage
+    };
+}
+
+function updateEMIFieldVisibility() {
+    const emiType = document.getElementById('emiType')?.value || 'regular';
+    const emiAmountGroup = document.getElementById('emiAmountGroup');
+    const emiAmountInput = document.getElementById('emiAmount');
+    
+    if (!emiAmountGroup || !emiAmountInput) return;
+
+    if (emiType === 'no-cost') {
         emiAmountGroup.style.display = 'none';
         emiAmountInput.required = false;
         emiAmountInput.disabled = true;
@@ -65,194 +92,189 @@ const updateEMIFieldVisibility = () => {
         emiAmountInput.disabled = false;
         emiAmountInput.value = '';
     }
-};
+}
 
-const calculateNoCostEMI = () => {
-    const totalAmount = parseFloat(totalAmountInput.value);
-    const loanTenure = parseInt(loanTenureInput.value);
-    
-    if (!isNaN(totalAmount) && !isNaN(loanTenure) && totalAmount > 0 && loanTenure > 0) {
-        const monthlyEMI = totalAmount / loanTenure;
-        emiAmountInput.value = monthlyEMI.toFixed(2);
-    }
-};
-
-const validateInput = (input, fieldName) => {
-    const value = parseFloat(input.value);
-    const errorElement = document.getElementById(`${input.id}-error`);
-    
-    if (isNaN(value) || value <= 0) {
-        errorElement.textContent = `Please enter a valid ${fieldName}`;
-        return false;
-    }
-    
-    errorElement.textContent = '';
-    return true;
-};
-
-// Calculation Functions
-const calculateEMIBreakdown = (totalAmount, loanTenure, emiAmount, interestRate, processingFees) => {
-    const monthlyInterestRate = interestRate / 12 / 100;
-    let remainingBalance = totalAmount;
-    const breakdown = [];
-    let totalHiddenCost = 0;
-
-    // Calculate processing fees with GST (only for first month)
-    const processingFeesWithGST = processingFees * (1 + GST_RATE);
-    totalHiddenCost += processingFeesWithGST;
-
-    for (let month = 1; month <= loanTenure; month++) {
-        const interest = remainingBalance * monthlyInterestRate;
-        const gstOnInterest = interest * GST_RATE;
-        let principalRepaid = emiAmount - interest;
-
-        // Adjust principal repaid if it's more than remaining balance
-        if (principalRepaid > remainingBalance) {
-            principalRepaid = remainingBalance;
-        }
-
-        const processingFeesForMonth = month === 1 ? processingFeesWithGST : 0;
-        const totalMonthlyPayment = emiAmount + gstOnInterest + processingFeesForMonth;
-
-        breakdown.push({
-            month,
-            remainingBalance,
-            principalRepaid,
-            interest,
-            gstOnInterest,
-            processingFees: processingFeesForMonth,
-            totalMonthlyPayment
-        });
-
-        remainingBalance -= principalRepaid;
-        totalHiddenCost += gstOnInterest;
-    }
-
-    return {
-        breakdown,
-        totalHiddenCost,
-        hiddenCostPercentage: (totalHiddenCost / totalAmount) * 100
-    };
-};
-
-// UI Update Functions
-const updateTable = (breakdown) => {
-    emiTableBody.innerHTML = '';
-    
-    breakdown.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${row.month}</td>
-            <td>${formatCurrency(row.remainingBalance)}</td>
-            <td>${formatCurrency(row.principalRepaid)}</td>
-            <td>${formatCurrency(row.interest)}</td>
-            <td>${formatCurrency(row.gstOnInterest)}</td>
-            <td>${formatCurrency(row.processingFees)}</td>
-            <td>${formatCurrency(row.totalMonthlyPayment)}</td>
-        `;
-        emiTableBody.appendChild(tr);
-    });
-};
-
-const updateSummary = (totalAmount, totalHiddenCost, hiddenCostPercentage) => {
-    summaryTotal.textContent = formatCurrency(totalAmount);
-    summaryHiddenCost.textContent = formatCurrency(totalHiddenCost);
-    summaryTotalPayable.textContent = formatCurrency(totalAmount + totalHiddenCost);
-    summaryHiddenPercentage.textContent = formatPercentage(hiddenCostPercentage);
-};
-
-// Event Listeners
-emiForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    // Get form inputs
+function calculateNoCostEMI() {
     const totalAmount = document.getElementById('totalAmount');
     const loanTenure = document.getElementById('loanTenure');
     const emiAmount = document.getElementById('emiAmount');
-    const interestRate = document.getElementById('interestRate');
-    const processingFees = document.getElementById('processingFees');
+    
+    if (!totalAmount || !loanTenure || !emiAmount) return;
+    
+    const amount = parseFloat(totalAmount.value);
+    const tenure = parseFloat(loanTenure.value);
+    
+    if (!isNaN(amount) && !isNaN(tenure) && tenure > 0) {
+        emiAmount.value = (amount / tenure).toFixed(2);
+    }
+}
 
-    // Validate inputs
-    const isValid = [
-        validateInput(totalAmount, 'Total Amount'),
-        validateInput(loanTenure, 'Loan Tenure'),
-        emiType.value === 'no-cost' || validateInput(emiAmount, 'Monthly EMI Amount'),
-        validateInput(interestRate, 'Interest Rate'),
-        validateInput(processingFees, 'Processing Fees')
-    ].every(Boolean);
-
-    if (!isValid) return;
-
-    // Calculate EMI breakdown
-    const result = calculateEMIBreakdown(
-        parseFloat(totalAmount.value),
-        parseInt(loanTenure.value),
-        parseFloat(emiAmount.value),
-        parseFloat(interestRate.value),
-        parseFloat(processingFees.value)
-    );
-
-    // Update UI
-    updateTable(result.breakdown);
-    updateSummary(
-        parseFloat(totalAmount.value),
-        result.totalHiddenCost,
-        result.hiddenCostPercentage
-    );
-
-    // Show results section and scroll to it
-    resultsSection.classList.remove('hidden');
-    scrollToResults();
-});
-
-recalculateBtn.addEventListener('click', () => {
-    scrollToTop();
-    resetForm();
-});
-
-// Add event listeners for EMI type changes
-emiType.addEventListener('change', () => {
-    updateEMIFieldVisibility();
-});
-
-// Add event listeners for automatic No Cost EMI calculation
-totalAmountInput.addEventListener('input', () => {
-    if (emiType.value === 'no-cost') {
+function handleInputChange() {
+    const emiType = document.getElementById('emiType');
+    if (emiType && emiType.value === 'no-cost') {
         calculateNoCostEMI();
     }
-});
+}
 
-loanTenureInput.addEventListener('input', () => {
-    if (emiType.value === 'no-cost') {
-        calculateNoCostEMI();
-    }
-});
+function updateEMITypeButtons(selectedType) {
+    const buttons = document.querySelectorAll('.emi-type-btn');
+    const emiTypeInput = document.getElementById('emiType');
+    
+    if (!buttons.length || !emiTypeInput) return;
 
-// Initialize EMI field visibility on page load
-updateEMIFieldVisibility();
-
-// EMI type button functionality
-const emiTypeButtons = document.querySelectorAll('.emi-type-btn');
-const emiTypeInput = document.getElementById('emiType');
-
-// Update EMI type buttons
-const updateEMITypeButtons = (selectedType) => {
-    emiTypeButtons.forEach(button => {
+    buttons.forEach(button => {
         if (button.dataset.type === selectedType) {
             button.classList.add('active');
         } else {
             button.classList.remove('active');
         }
     });
+    
     emiTypeInput.value = selectedType;
     updateEMIFieldVisibility();
-};
+}
 
-// Add event listeners for EMI type buttons
-emiTypeButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        const selectedType = button.dataset.type;
-        updateEMITypeButtons(selectedType);
-        resetForm();
+function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const inputs = form.querySelectorAll('input[type="number"]');
+    let isValid = true;
+    
+    inputs.forEach(input => {
+        const label = input.name.split(/(?=[A-Z])/).join(' ');
+        if (!validateInput(input, label)) {
+            isValid = false;
+        }
     });
-});
+    
+    if (!isValid) return;
+    
+    const totalAmount = parseFloat(document.getElementById('totalAmount').value);
+    const loanTenure = parseFloat(document.getElementById('loanTenure').value);
+    const emiAmount = parseFloat(document.getElementById('emiAmount').value);
+    const interestRate = parseFloat(document.getElementById('interestRate').value);
+    const processingFees = parseFloat(document.getElementById('processingFees').value);
+
+    const result = calculateEMIBreakdown(totalAmount, loanTenure, emiAmount, interestRate, processingFees);
+    updateResults(result);
+}
+
+function handleRecalculate() {
+    const form = document.getElementById('emiForm');
+    if (form) {
+        form.reset();
+        const results = document.getElementById('results');
+        if (results) {
+            results.classList.add('hidden');
+        }
+    }
+}
+
+function updateResults(result) {
+    const resultsDiv = document.getElementById('results');
+    const tableBody = document.getElementById('emiTableBody');
+    
+    if (!resultsDiv || !tableBody) return;
+    
+    tableBody.innerHTML = '';
+    result.breakdown.forEach(month => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${month.month}</td>
+            <td>${formatCurrency(month.principalRepaid)}</td>
+            <td>${formatCurrency(month.interest)}</td>
+            <td>${formatCurrency(month.gstOnInterest)}</td>
+            <td>${formatCurrency(month.processingFees)}</td>
+            <td>${formatCurrency(month.totalMonthlyPayment)}</td>
+            <td>${formatCurrency(month.remainingBalance)}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    
+    const summaryTotal = document.getElementById('summary-total');
+    const summaryHiddenCost = document.getElementById('summary-hidden-cost');
+    const summaryTotalPayable = document.getElementById('summary-total-payable');
+    const summaryHiddenPercentage = document.getElementById('summary-hidden-percentage');
+    
+    if (summaryTotal) {
+        summaryTotal.textContent = formatCurrency(result.breakdown[0].remainingBalance);
+    }
+    if (summaryHiddenCost) {
+        summaryHiddenCost.textContent = formatCurrency(result.totalHiddenCost);
+    }
+    if (summaryTotalPayable) {
+        summaryTotalPayable.textContent = formatCurrency(result.breakdown[0].remainingBalance + result.totalHiddenCost);
+    }
+    if (summaryHiddenPercentage) {
+        summaryHiddenPercentage.textContent = formatPercentage(result.hiddenCostPercentage);
+    }
+    
+    resultsDiv.classList.remove('hidden');
+}
+
+// Initialize DOM elements and event listeners if we're in a browser environment
+if (typeof window !== 'undefined') {
+    // Initialize DOM elements
+    const emiForm = document.getElementById('emiForm');
+    const resultsSection = document.getElementById('results');
+    const emiTableBody = document.getElementById('emiTableBody');
+    const summaryTotal = document.getElementById('summary-total');
+    const summaryHiddenCost = document.getElementById('summary-hidden-cost');
+    const summaryTotalPayable = document.getElementById('summary-total-payable');
+    const summaryHiddenPercentage = document.getElementById('summary-hidden-percentage');
+    const recalculateBtn = document.getElementById('recalculateBtn');
+    const calculatorSection = document.getElementById('calculator-section');
+    const emiType = document.getElementById('emiType');
+    const emiAmountGroup = document.getElementById('emiAmountGroup');
+    const emiAmountInput = document.getElementById('emiAmount');
+    const totalAmountInput = document.getElementById('totalAmount');
+    const loanTenureInput = document.getElementById('loanTenure');
+    const emiTypeButtons = document.querySelectorAll('.emi-type-btn');
+
+    // Add event listeners
+    if (emiForm) {
+        emiForm.addEventListener('submit', handleFormSubmit);
+    }
+    if (emiTypeButtons) {
+        emiTypeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const selectedType = button.dataset.type;
+                updateEMITypeButtons(selectedType);
+                handleRecalculate();
+            });
+        });
+    }
+    if (recalculateBtn) {
+        recalculateBtn.addEventListener('click', handleRecalculate);
+    }
+    if (totalAmountInput) {
+        totalAmountInput.addEventListener('input', handleInputChange);
+    }
+    if (loanTenureInput) {
+        loanTenureInput.addEventListener('input', handleInputChange);
+    }
+    if (emiType) {
+        emiType.addEventListener('change', updateEMIFieldVisibility);
+    }
+
+    // Initialize EMI field visibility
+    updateEMIFieldVisibility();
+}
+
+// Export functions for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        calculateEMIBreakdown,
+        formatCurrency,
+        formatPercentage,
+        validateInput,
+        updateEMIFieldVisibility,
+        calculateNoCostEMI,
+        handleInputChange,
+        updateEMITypeButtons,
+        handleFormSubmit,
+        handleRecalculate,
+        GST_RATE
+    };
+}
