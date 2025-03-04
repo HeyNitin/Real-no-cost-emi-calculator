@@ -191,6 +191,29 @@ input:focus {
     background-color: var(--primary-hover);
 }
 
+.emi-display-container {
+    margin-bottom: 1.5rem;
+    background-color: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: 0.375rem;
+    border-left: 4px solid var(--primary-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.emi-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.emi-amount {
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
 .results {
     background-color: var(--bg-color);
     padding: 2rem;

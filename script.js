@@ -38,7 +38,7 @@ function validateInput(input, fieldName) {
 function calculateEMIBreakdown(totalAmount, loanTenure, emiAmount, interestRate, processingFees) {
     const breakdown = [];
     let remainingBalance = totalAmount;
-    let totalProcessingFees = processingFees * (1 + GST_RATE);
+    let totalProcessingFees = processingFees
     let totalInterest = 0;
     let totalGSTOnInterest = 0;
 
@@ -50,13 +50,21 @@ function calculateEMIBreakdown(totalAmount, loanTenure, emiAmount, interestRate,
         totalInterest += monthlyInterest;
         totalGSTOnInterest += gstOnInterest;
         
+        let processingFeesDisplay = 0;
+        let gstOnInterestDisplay = gstOnInterest;
+        if (month === 1) {
+            processingFeesDisplay = totalProcessingFees; // Show processing fees + GST for the first month
+        }
+
+        processingFeesDisplay += gstOnInterest;
+        
         const monthlyBreakdown = {
             month,
             principalRepaid,
             interest: monthlyInterest,
-            gstOnInterest,
-            processingFees: month === 1 ? totalProcessingFees : 0,
-            totalMonthlyPayment: emiAmount + (month === 1 ? totalProcessingFees : 0) + gstOnInterest,
+            gstOnInterest: gstOnInterestDisplay,
+            processingFees: processingFeesDisplay,
+            totalMonthlyPayment: Number(emiAmount) +processingFeesDisplay,
             remainingBalance: Math.max(0, remainingBalance - principalRepaid)
         };
         
@@ -64,14 +72,34 @@ function calculateEMIBreakdown(totalAmount, loanTenure, emiAmount, interestRate,
         remainingBalance = monthlyBreakdown.remainingBalance;
     }
 
-    const totalHiddenCost = totalProcessingFees + totalInterest + totalGSTOnInterest;
+    const totalHiddenCost = totalProcessingFees + totalGSTOnInterest;
     const hiddenCostPercentage = (totalHiddenCost / totalAmount) * 100;
 
     return {
         breakdown,
         totalHiddenCost,
-        hiddenCostPercentage
+        hiddenCostPercentage,
+        totalInterest
     };
+}
+
+// Calculate EMI amount based on loan details
+function calculateEMIAmount(principal, interestRate, loanTenure) {
+    // Check for invalid inputs
+    if (isNaN(principal) || isNaN(interestRate) || isNaN(loanTenure) || principal <= 0 || loanTenure <= 0) {
+        throw new Error('Invalid input values for EMI calculation.');
+    }
+
+    // Monthly interest rate
+    const monthlyRate = interestRate / 12 / 100;
+
+    // Formula for EMI calculation: P × r × (1 + r)^n / ((1 + r)^n - 1)
+    if (interestRate === 0) {
+        return principal / loanTenure;
+    } else {
+        const term = Math.pow(1 + monthlyRate, loanTenure);
+        return principal * monthlyRate * term / (term - 1);
+    }
 }
 
 function updateEMIFieldVisibility() {
@@ -81,17 +109,14 @@ function updateEMIFieldVisibility() {
     
     if (!emiAmountGroup || !emiAmountInput) return;
 
-    if (emiType === 'no-cost') {
-        emiAmountGroup.style.display = 'none';
-        emiAmountInput.required = false;
-        emiAmountInput.disabled = true;
-        calculateNoCostEMI();
-    } else {
-        emiAmountGroup.style.display = 'block';
-        emiAmountInput.required = true;
-        emiAmountInput.disabled = false;
-        emiAmountInput.value = '';
-    }
+    // Always hide the EMI amount group initially
+    emiAmountGroup.style.display = 'none'; 
+    emiAmountInput.value = ''; // Reset the EMI amount field
+    emiAmountInput.required = false;
+    emiAmountInput.disabled = true;
+
+    calculateNoCostEMI(); // Calculate for no-cost EMI    
+    updateEMIDisplay(); // Update the EMI display
 }
 
 function calculateNoCostEMI() {
@@ -109,11 +134,85 @@ function calculateNoCostEMI() {
     }
 }
 
+function calculateRegularEMI() {
+    const totalAmount = document.getElementById('totalAmount');
+    const loanTenure = document.getElementById('loanTenure');
+    const interestRate = document.getElementById('interestRate');
+    const emiAmount = document.getElementById('emiAmount');
+    
+    if (!totalAmount || !loanTenure || !interestRate || !emiAmount) return;
+    
+    const amount = parseFloat(totalAmount.value);
+    const tenure = parseFloat(loanTenure.value);
+    const rate = parseFloat(interestRate.value);
+    
+    if (!isNaN(amount) && !isNaN(tenure) && !isNaN(rate) && tenure > 0) {
+        try {
+            emiAmount.value = calculateEMIAmount(amount, rate, tenure).toFixed(2);
+        } catch (error) {
+            console.error('Error calculating EMI:', error.message);
+        }
+    }
+}
+
+function updateEMIDisplay() {
+    const emiAmount = document.getElementById('emiAmount');
+    const totalAmount = document.getElementById('totalAmount');
+    const loanTenure = document.getElementById('loanTenure');
+    const interestRate = document.getElementById('interestRate');
+    const emiType = document.getElementById('emiType')?.value || 'regular';
+    let emiDisplayElement = document.getElementById('emiDisplayContainer');
+    
+    // Create EMI display element if it doesn't exist
+    if (!emiDisplayElement) {
+        emiDisplayElement = document.createElement('div');
+        emiDisplayElement.id = 'emiDisplayContainer';
+        emiDisplayElement.className = 'emi-display-container';
+        
+        // Find where to insert the display
+        const formGroups = document.querySelectorAll('.form-group');
+        if (formGroups.length > 0) {
+            const interestRateGroup = document.querySelector('.form-group:nth-child(4)');
+            if (interestRateGroup) {
+                interestRateGroup.parentNode.insertBefore(emiDisplayElement, interestRateGroup.nextSibling);
+            }
+        }
+    }
+    
+    // Check if we have all required values
+    const hasRequiredNoCostValues = emiType === 'no-cost' && 
+        totalAmount && !isNaN(parseFloat(totalAmount.value)) && 
+        loanTenure && !isNaN(parseFloat(loanTenure.value)) && 
+        parseFloat(loanTenure.value) > 0;
+        
+    const hasRequiredRegularValues = emiType === 'regular' && 
+        totalAmount && !isNaN(parseFloat(totalAmount.value)) && 
+        loanTenure && !isNaN(parseFloat(loanTenure.value)) && 
+        interestRate && !isNaN(parseFloat(interestRate.value)) && 
+        parseFloat(loanTenure.value) > 0;
+    
+    // Update display
+    if ((hasRequiredNoCostValues || hasRequiredRegularValues) && emiAmount && emiAmount.value) {
+        emiDisplayElement.innerHTML = `
+            <div class="emi-display">
+                <span>Monthly EMI Amount (₹) : </span>
+                <span class="emi-amount">${formatCurrency(parseFloat(emiAmount.value))}</span>
+            </div>
+        `;
+        emiDisplayElement.style.display = 'block';
+    } else {
+        emiDisplayElement.style.display = 'none';
+    }
+}
+
 function handleInputChange() {
     const emiType = document.getElementById('emiType');
     if (emiType && emiType.value === 'no-cost') {
         calculateNoCostEMI();
+    } else if (emiType && emiType.value === 'regular') {
+        calculateRegularEMI();
     }
+    updateEMIDisplay();
 }
 
 function updateEMITypeButtons(selectedType) {
@@ -150,14 +249,30 @@ function handleFormSubmit(e) {
     
     if (!isValid) return;
     
-    const totalAmount = parseFloat(document.getElementById('totalAmount').value);
-    const loanTenure = parseFloat(document.getElementById('loanTenure').value);
-    const emiAmount = parseFloat(document.getElementById('emiAmount').value);
-    const interestRate = parseFloat(document.getElementById('interestRate').value);
-    const processingFees = parseFloat(document.getElementById('processingFees').value);
+    const totalAmount = document.getElementById('totalAmount');
+    const loanTenure = document.getElementById('loanTenure');
+    const emiAmount = document.getElementById('emiAmount');
+    const interestRate = document.getElementById('interestRate');
+    const processingFees = document.getElementById('processingFees');
+    const amount = parseFloat(totalAmount.value);
+    const processingFeesValue = parseFloat(processingFees.value);
 
-    const result = calculateEMIBreakdown(totalAmount, loanTenure, emiAmount, interestRate, processingFees);
-    updateResults(result);
+    try {
+        const result = calculateEMIBreakdown(amount, loanTenure.value, emiAmount.value, interestRate.value, processingFeesValue);
+        updateResults(result, amount);
+    } catch (error) {
+        console.error('Error calculating EMI breakdown:', error.message);
+    }
+    
+    // Scroll to the results section with an offset
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv) {
+        const offsetPosition = resultsDiv.getBoundingClientRect().top + window.scrollY - 100; // 100px offset
+        window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+        });
+    }
 }
 
 function handleRecalculate() {
@@ -171,9 +286,10 @@ function handleRecalculate() {
     }
 }
 
-function updateResults(result) {
+function updateResults(result, totalAmount) {
     const resultsDiv = document.getElementById('results');
     const tableBody = document.getElementById('emiTableBody');
+    const summaryTotalInterest = document.getElementById('summary-total-interest');
     
     if (!resultsDiv || !tableBody) return;
     
@@ -182,12 +298,12 @@ function updateResults(result) {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${month.month}</td>
+            <td>${formatCurrency(month.remainingBalance)}</td>
             <td>${formatCurrency(month.principalRepaid)}</td>
             <td>${formatCurrency(month.interest)}</td>
             <td>${formatCurrency(month.gstOnInterest)}</td>
             <td>${formatCurrency(month.processingFees)}</td>
             <td>${formatCurrency(month.totalMonthlyPayment)}</td>
-            <td>${formatCurrency(month.remainingBalance)}</td>
         `;
         tableBody.appendChild(row);
     });
@@ -196,15 +312,28 @@ function updateResults(result) {
     const summaryHiddenCost = document.getElementById('summary-hidden-cost');
     const summaryTotalPayable = document.getElementById('summary-total-payable');
     const summaryHiddenPercentage = document.getElementById('summary-hidden-percentage');
+    const emiType = document.getElementById('emiType')?.value || 'regular';
     
     if (summaryTotal) {
-        summaryTotal.textContent = formatCurrency(result.breakdown[0].remainingBalance);
+        summaryTotal.textContent = formatCurrency(totalAmount);
+    }
+    if (emiType === 'regular') {
+        summaryTotalInterest.parentElement.style.display = 'flex'; // Show the Total Interest field
+        summaryTotalInterest.textContent = formatCurrency(result.totalInterest);
+    } else {
+        summaryTotalInterest.parentElement.style.display = 'none'; // Hide the entire Total Interest field
+    }
+    if (emiType === 'regular') {
+        if (summaryTotalPayable) {
+            summaryTotalPayable.textContent = formatCurrency(totalAmount + result.totalHiddenCost + result.totalInterest);
+        }
+    } else {
+        if (summaryTotalPayable) {
+            summaryTotalPayable.textContent = formatCurrency(totalAmount + result.totalHiddenCost);
+        }
     }
     if (summaryHiddenCost) {
         summaryHiddenCost.textContent = formatCurrency(result.totalHiddenCost);
-    }
-    if (summaryTotalPayable) {
-        summaryTotalPayable.textContent = formatCurrency(result.breakdown[0].remainingBalance + result.totalHiddenCost);
     }
     if (summaryHiddenPercentage) {
         summaryHiddenPercentage.textContent = formatPercentage(result.hiddenCostPercentage);
@@ -257,6 +386,18 @@ if (typeof window !== 'undefined') {
     if (emiType) {
         emiType.addEventListener('change', updateEMIFieldVisibility);
     }
+    
+    // Add listeners for interest rate and processing fees
+    const interestRateInput = document.getElementById('interestRate');
+    const processingFeesInput = document.getElementById('processingFees');
+    
+    if (interestRateInput) {
+        interestRateInput.addEventListener('input', handleInputChange);
+    }
+    
+    if (processingFeesInput) {
+        processingFeesInput.addEventListener('input', handleInputChange);
+    }
 
     // Initialize EMI field visibility
     updateEMIFieldVisibility();
@@ -271,10 +412,13 @@ if (typeof module !== 'undefined' && module.exports) {
         validateInput,
         updateEMIFieldVisibility,
         calculateNoCostEMI,
+        calculateRegularEMI,
+        updateEMIDisplay,
         handleInputChange,
         updateEMITypeButtons,
         handleFormSubmit,
         handleRecalculate,
+        calculateEMIAmount,
         GST_RATE
     };
 }

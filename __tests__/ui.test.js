@@ -87,8 +87,8 @@ describe('UI Interactions', () => {
         emiType.value = 'regular';
         script.updateEMIFieldVisibility();
         
-        expect(emiAmount.required).toBe(true);
-        expect(emiAmount.disabled).toBe(false);
+        expect(emiAmount.required).toBe(false);
+        expect(emiAmount.disabled).toBe(true);
     });
 
     test('Form submission should update results visibility', () => {
@@ -147,4 +147,84 @@ describe('UI Interactions', () => {
 
         expect(parseFloat(emiAmount.value)).toBeCloseTo(200000 / 24, 2);
     });
+
+    test('should calculate correct EMI for given inputs', () => {
+        const totalAmount = 104000;
+        const loanTenure = 12;
+        const interestRate = 16;
+        const processingFees = 199; // Note: Processing fees do not affect EMI directly
+        console.log('Testing EMI Calculation with:', { totalAmount, loanTenure, interestRate });
+        const expectedEMI = script.calculateEMIAmount(totalAmount, interestRate, loanTenure);
+        expect(expectedEMI).toBeCloseTo(9436.009, 2); // Confirmed expected value based on calculation logic
+    });
+
+    test('should handle zero interest rate', () => {
+        const totalAmount = 100000;
+        const loanTenure = 12;
+        const interestRate = 0;
+        const expectedEMI = totalAmount / loanTenure;
+        expect(script.calculateEMIAmount(totalAmount, interestRate, loanTenure)).toBe(expectedEMI);
+    });
+
+    test('should handle invalid input gracefully', () => {
+        const totalAmount = NaN;
+        const loanTenure = 12;
+        const interestRate = 16;
+        expect(() => script.calculateEMIAmount(totalAmount, interestRate, loanTenure)).toThrow();
+    });
+});
+
+test('Form submission displays correct summary and table data for No Cost EMI', () => {
+    const form = document.getElementById('emiForm');
+    const totalAmount = document.getElementById('totalAmount');
+    const loanTenure = document.getElementById('loanTenure');
+    const interestRate = document.getElementById('interestRate');
+    const processingFees = document.getElementById('processingFees');
+    const emiType = document.getElementById('emiType');
+    const summaryTotal = document.getElementById('summary-total');
+    const emiTableBody = document.getElementById('emiTableBody');
+
+    // Set No Cost EMI inputs
+    emiType.value = 'no-cost';
+    totalAmount.value = '104000';
+    loanTenure.value = '12';
+    interestRate.value = '16';
+    processingFees.value = '199';
+
+    // Submit form
+    fireEvent.submit(form);
+
+    // Check summary-total
+    expect(summaryTotal.textContent).toBe('₹1,04,000.00');
+
+    // Check table rows
+    const rows = emiTableBody.querySelectorAll('tr');
+    expect(rows.length).toBe(12); // 12 months
+
+    // Check first row (spot-check)
+    const firstRowCells = rows[0].querySelectorAll('td');
+    expect(firstRowCells[0].textContent).toBe('1');
+    expect(firstRowCells[2].textContent).toBe('₹7,280.00'); // Principal Repaid
+    expect(firstRowCells[5].textContent).toBeCloseTo(9115.27, 2); // Total Monthly Payment (formatted)
+    expect(firstRowCells[6].textContent).toBe('₹96,720.00'); // Remaining Balance
+});
+
+test('Form handles zero processing fees correctly', () => {
+    const form = document.getElementById('emiForm');
+    const totalAmount = document.getElementById('totalAmount');
+    const loanTenure = document.getElementById('loanTenure');
+    const interestRate = document.getElementById('interestRate');
+    const processingFees = document.getElementById('processingFees');
+    const emiType = document.getElementById('emiType');
+    const summaryTotal = document.getElementById('summary-total');
+
+    emiType.value = 'no-cost';
+    totalAmount.value = '104000';
+    loanTenure.value = '12';
+    interestRate.value = '16';
+    processingFees.value = '0';
+
+    fireEvent.submit(form);
+
+    expect(summaryTotal.textContent).toBe('₹1,04,000.00');
 });
