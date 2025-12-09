@@ -38,7 +38,7 @@ function validateInput(input, fieldName) {
 function calculateEMIBreakdown(totalAmount, loanTenure, emiAmount, interestRate, processingFees) {
     const breakdown = [];
     let remainingBalance = totalAmount;
-    let totalProcessingFees = processingFees
+    let totalProcessingFees = processingFees * (1 + GST_RATE)
     let totalInterest = 0;
     let totalGSTOnInterest = 0;
 
