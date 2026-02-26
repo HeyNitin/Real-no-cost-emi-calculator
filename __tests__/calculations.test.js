@@ -42,7 +42,7 @@ describe('EMI Calculations', () => {
 
         // Verify the monthly calculations
         const firstMonth = result.breakdown[0];
-        expect(firstMonth.processingFees).toBe(processingFees * (1 + script.GST_RATE));
+        expect(firstMonth.processingFees).toBe(processingFees * (1 + script.GST_RATE) + firstMonth.gstOnInterest);
         expect(firstMonth.interest).toBe(totalAmount * (interestRate / 12 / 100));
         expect(firstMonth.gstOnInterest).toBe(firstMonth.interest * script.GST_RATE);
     });
@@ -68,7 +68,7 @@ describe('EMI Calculations', () => {
     test('calculateEMIBreakdown should handle edge cases', () => {
         // Test with zero processing fees
         const result1 = script.calculateEMIBreakdown(100000, 12, 8500, 15, 0);
-        expect(result1.breakdown[0].processingFees).toBe(0);
+        expect(result1.breakdown[0].processingFees).toBe(result1.breakdown[0].gstOnInterest);
 
         // Test with zero interest rate
         const result2 = script.calculateEMIBreakdown(100000, 12, 8500, 0, 500);

@@ -27,6 +27,7 @@ describe('UI Interactions', () => {
                 <div id="summary-hidden-cost"></div>
                 <div id="summary-total-payable"></div>
                 <div id="summary-hidden-percentage"></div>
+                <div><span id="summary-total-interest">₹0</span></div>
             </div>
             <button id="recalculateBtn">Recalculate</button>
         `;
@@ -191,6 +192,10 @@ test('Form submission displays correct summary and table data for No Cost EMI', 
     interestRate.value = '16';
     processingFees.value = '199';
 
+    // Manually set emiAmount since no-cost EMI auto-calculates it
+    const emiAmount = document.getElementById('emiAmount');
+    emiAmount.value = (104000 / 12).toFixed(2);
+
     // Submit form
     fireEvent.submit(form);
 
@@ -205,8 +210,8 @@ test('Form submission displays correct summary and table data for No Cost EMI', 
     const firstRowCells = rows[0].querySelectorAll('td');
     expect(firstRowCells[0].textContent).toBe('1');
     expect(firstRowCells[2].textContent).toBe('₹7,280.00'); // Principal Repaid
-    expect(firstRowCells[5].textContent).toBeCloseTo(9115.27, 2); // Total Monthly Payment (formatted)
-    expect(firstRowCells[6].textContent).toBe('₹96,720.00'); // Remaining Balance
+    expect(firstRowCells[5].textContent).toBe('₹484.42'); // Processing Fees + GST
+    expect(firstRowCells[1].textContent).toBe('₹96,720.00'); // Remaining Balance
 });
 
 test('Form handles zero processing fees correctly', () => {

@@ -1,6 +1,12 @@
 // Constants
 const GST_RATE = 0.18;
 
+function trackEvent(eventName, params) {
+    if (typeof gtag === 'function') {
+        gtag('event', eventName, params);
+    }
+}
+
 // Utility Functions
 function formatCurrency(amount) {
     return new Intl.NumberFormat('en-IN', {
@@ -230,6 +236,7 @@ function updateEMITypeButtons(selectedType) {
     });
     
     emiTypeInput.value = selectedType;
+    trackEvent('emi_type_changed', { emi_type: selectedType });
     updateEMIFieldVisibility();
 }
 
@@ -260,6 +267,12 @@ function handleFormSubmit(e) {
     try {
         const result = calculateEMIBreakdown(amount, loanTenure.value, emiAmount.value, interestRate.value, processingFeesValue);
         updateResults(result, amount);
+        trackEvent('emi_calculated', {
+            emi_type: document.getElementById('emiType')?.value,
+            product_price: amount,
+            loan_tenure: parseFloat(loanTenure.value),
+            interest_rate: parseFloat(interestRate.value)
+        });
     } catch (error) {
         console.error('Error calculating EMI breakdown:', error.message);
     }
@@ -279,6 +292,7 @@ function handleRecalculate() {
     const form = document.getElementById('emiForm');
     if (form) {
         form.reset();
+        trackEvent('form_reset');
         const results = document.getElementById('results');
         if (results) {
             results.classList.add('hidden');
